@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>맞춤 구구단 연습 게임</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f4f7f6;
+            text-align: center;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            width: 90%;
+            max-width: 450px;
+        }
+        h1 {
+            color: #005a9c;
+            margin-bottom: 25px;
+        }
+
+        /* --- 설정 화면 스타일 --- */
+        #settings-container h2 {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        #dan-selection {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        #dan-selection label {
+            display: block;
+            padding: 10px 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+        #dan-selection input[type="checkbox"] {
+            display: none; /* 실제 체크박스는 숨김 */
+        }
+        /* 사용자가 체크박스를 선택했을 때 라벨 스타일 변경 */
+        #dan-selection input[type="checkbox"]:checked + span {
+            color: #fff;
+            font-weight: bold;
+        }
+        #dan-selection input[type="checkbox"]:checked + span::before {
+            content: '✔ ';
+        }
+        #dan-selection label:has(input:checked) {
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+
+        /* --- 게임 화면 스타일 --- */
+        #game-container {
+            display: none; /* 처음에는 게임 화면을 숨김 */
+        }
+        #problem-area {
+            font-size: 3.2em;
+            font-weight: bold;
+            margin: 25px 0;
+            color: #333;
+            height: 65px;
+        }
+        #answer-input {
+            width: calc(100% - 24px);
+            padding: 12px;
+            margin-bottom: 20px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1.5em;
+            text-align: center;
+            transition: border-color 0.3s ease;
+        }
+        #answer-input:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+        .button {
+            flex-grow: 1;
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        #submit-button {
+            background-color: #28a745;
+            color: white;
+        }
+        #submit-button:hover { background-color: #218838; }
+        #reset-button, #start-button {
+            background-color: #6c757d;
+            color: white;
+        }
+        #reset-button:hover, #start-button:hover { background-color: #5a6268; }
+
+        #result-message {
+            margin-top: 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+            height: 30px;
+        }
+        .correct { color: #28a745; }
+        .incorrect { color: #dc3545; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- 설정 화면 -->
+        <div id="settings-container">
+            <h1>맞춤 구구단 연습</h1>
+            <h2>연습할 구구단을 선택하세요.</h2>
+            <div id="dan-selection">
+                <!-- 자바스크립트로 2단부터 9단까지 체크박스 생성 -->
+            </div>
+            <button id="start-button" class="button">연습 시작하기</button>
+        </div>
+
+        <!-- 게임 화면 -->
+        <div id="game-container">
+            <h1>구구단 연습</h1>
+            <div id="problem-area"></div>
+            <form onsubmit="checkAnswer(); return false;">
+                <input type="number" id="answer-input" required autocomplete="off" placeholder="정답">
+                <div class="button-group">
+                    <button type="button" id="reset-button" class="button">단 선택으로</button>
+                    <button type="submit" id="submit-button" class="button">정답 확인</button>
+                </div>
+            </form>
+            <div id="result-message"></div>
+        </div>
+    </div>
+
+    <script>
+        // 전역 변수 선언
+        const settingsContainer = document.getElementById('settings-container');
+        const gameContainer = document.getElementById('game-container');
+        const danSelection = document.getElementById('dan-selection');
+        const startButton = document.getElementById('start-button');
+        const resetButton = document.getElementById('reset-button');
+        const problemArea = document.getElementById('problem-area');
+        const answerInput = document.getElementById('answer-input');
+        const resultMessage = document.getElementById('result-message');
+        
+        let selectedDans = [];
+        let currentAnswer;
+        let currentProblem = {};
+
+        // 2단부터 9단까지 체크박스 동적 생성
+        for (let i = 2; i <= 9; i++) {
+            const label = document.createElement('label');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = i;
+            const span = document.createElement('span');
+            span.textContent = `${i}단`;
+            label.appendChild(checkbox);
+            label.appendChild(span);
+            danSelection.appendChild(label);
+        }
+
+        // "연습 시작하기" 버튼 이벤트 리스너
+        startButton.addEventListener('click', () => {
+            selectedDans = Array.from(danSelection.querySelectorAll('input:checked')).map(cb => parseInt(cb.value));
+            
+            if (selectedDans.length === 0) {
+                alert('연습할 구구단을 하나 이상 선택해주세요!');
+                return;
+            }
+
+            settingsContainer.style.display = 'none';
+            gameContainer.style.display = 'block';
+            generateProblem();
+        });
+
+        // "단 선택으로" 버튼 이벤트 리스너
+        resetButton.addEventListener('click', () => {
+            gameContainer.style.display = 'none';
+            settingsContainer.style.display = 'block';
+            problemArea.textContent = '';
+            resultMessage.textContent = '';
+        });
+
+        // 새 문제를 생성하거나 기존 문제를 표시하는 함수
+        function generateProblem(isNew = true) {
+            if (isNew) {
+                // 선택된 단 중에서 무작위로 하나를 선택
+                const randomDanIndex = Math.floor(Math.random() * selectedDans.length);
+                const num1 = selectedDans[randomDanIndex];
+                // 1부터 9까지의 수 무작위 선택
+                const num2 = Math.floor(Math.random() * 9) + 1;
+                
+                currentProblem = { num1, num2 };
+                currentAnswer = num1 * num2;
+            }
+
+            problemArea.textContent = `${currentProblem.num1} × ${currentProblem.num2} = ?`;
+            resultMessage.textContent = '';
+            answerInput.value = '';
+            answerInput.focus();
+        }
+
+        // 정답을 확인하는 함수
+        function checkAnswer() {
+            const userAnswer = parseInt(answerInput.value, 10);
+
+            if (userAnswer === currentAnswer) {
+                resultMessage.textContent = "정답입니다! 🎉";
+                resultMessage.className = 'correct';
+                // 1초 후에 새로운 문제 출제
+                setTimeout(() => generateProblem(true), 1000);
+            } else {
+                resultMessage.textContent = "틀렸습니다. 다시 도전하세요! 🤔";
+                resultMessage.className = 'incorrect';
+                // 오답 시 입력창만 비우고 같은 문제에 다시 도전
+                answerInput.value = '';
+                answerInput.focus();
+            }
+        }
+    </script>
+
+</body>
+</html>
